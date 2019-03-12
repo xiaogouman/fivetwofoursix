@@ -5,7 +5,6 @@ import math
 import sys
 import gzip
 import numpy as np
-import bcolz
 
 import torch
 import torch.nn as nn
