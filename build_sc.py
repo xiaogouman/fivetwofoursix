@@ -41,7 +41,7 @@ def load_train_docs(train_text_file):
 
 def load_word_embeddings(embeddings_file):
     embedding = {}
-    with gzip.open(train_label_file, "rb") as file:
+    with gzip.open(embeddings_file, "rb") as file:
         for l in file:
             line = l.decode().split()
             word = line[0]
