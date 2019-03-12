@@ -40,13 +40,6 @@ def load_train_docs(train_text_file):
     return result
 
 def load_word_embeddings(embeddings_file):
-    result = []
-    with gzip.open(embeddings_file, "rb") as file:
-        for line in file:
-            result.append(line)
-    return result
-
-def load_train_label(train_label_file):
     embedding = {}
     with open(train_label_file, "rb") as file:
         for l in file:
@@ -54,7 +47,15 @@ def load_train_label(train_label_file):
             word = line[0]
             vect = np.array(line[1:]).astype(np.float)
             embedding[word] = vect
+            print(word, vect)
     return embedding
+
+def load_train_label(train_label_file):
+    result = []
+    with gzip.open(train_label_file, "r") as file:
+        for line in file:
+            result.append(line)
+    return result
 
 def train_model(embeddings_file, train_text_file, train_label_file, model_file):
     # write your code here. You can add functions as well.
