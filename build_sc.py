@@ -58,9 +58,9 @@ def train_model(embeddings_file, train_text_file, train_label_file, model_file):
 
     # load data
     train_input = load_train_docs(train_text_file)
-    print(train_input)
     train_label = load_train_label(train_label_file)
-    print(train_label)
+    embeddings = load_word_embeddings(embeddings_file)
+    print(embeddings[:3])
     # how to use look up table??
     print('Finished...')
 		
