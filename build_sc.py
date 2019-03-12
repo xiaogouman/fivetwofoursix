@@ -4,6 +4,8 @@ import os
 import math
 import sys
 import gzip
+import numpy as np
+import bcolz
 
 import torch
 import torch.nn as nn
@@ -46,11 +48,14 @@ def load_word_embeddings(embeddings_file):
     return result
 
 def load_train_label(train_label_file):
-    result = []
-    with open(train_label_file, "r") as file:
-        for line in file:
-            result.append(int(line))
-    return result
+    embedding = {}
+    with open(train_label_file, "rb") as file:
+        for l in file:
+            line = l.decode().split()
+            word = line[0]
+            vect = np.array(line[1:]).astype(np.float)
+            embedding[word] = vect
+    return embedding
 
 def train_model(embeddings_file, train_text_file, train_label_file, model_file):
     # write your code here. You can add functions as well.
@@ -60,9 +65,10 @@ def train_model(embeddings_file, train_text_file, train_label_file, model_file):
     train_input = load_train_docs(train_text_file)
     train_label = load_train_label(train_label_file)
     embeddings = load_word_embeddings(embeddings_file)
-    for i in range(3):
-        print(embeddings[i])
-        print("length: ", len(embeddings[i]))
+
+    first2pairs = {k: embeddings[k] for k in list(embeddings)[:3]}
+    for key, value in first2pairs:
+        print(key, value)
 
     # how to use look up table??
     print('Finished...')
