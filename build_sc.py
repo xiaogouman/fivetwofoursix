@@ -40,9 +40,9 @@ def load_train_docs(train_text_file):
 
 def load_word_embeddings(embeddings_file):
     result = []
-    with gzip.open(embeddings_file, "r") as file:
+    with gzip.open(embeddings_file, "rb") as file:
         for line in file:
-            result.append(line.split(" "))
+            result.append(line)
     return result
 
 def load_train_label(train_label_file):
