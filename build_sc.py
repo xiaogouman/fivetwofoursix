@@ -11,6 +11,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
+import pickle
+
 class CNN(nn.Module):
     def __init__(self):
         super(CNN, self).__init__()
@@ -40,6 +42,10 @@ def load_train_docs(train_text_file):
     return result
 
 def load_word_embeddings(embeddings_file):
+    if os.path.exists('embeddings.pickle'):
+        with open('embeddings.pickle', 'rb') as file:
+            embedding = pickle.load(file, encoding='utf-8')
+        return embedding
     embedding = {}
     with gzip.open(embeddings_file, "rb") as file:
         for l in file:
@@ -47,6 +53,8 @@ def load_word_embeddings(embeddings_file):
             word = line[0]
             vect = np.array(line[1:]).astype(np.float)
             embedding[word] = vect
+    with open('embeddings.pickle', 'wb') as file:
+        pickle.dump(embedding, file)
     return embedding
 
 def load_train_label(train_label_file):
