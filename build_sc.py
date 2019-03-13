@@ -43,11 +43,10 @@ def load_word_embeddings(embeddings_file):
     embedding = {}
     with gzip.open(embeddings_file, "rb") as file:
         for l in file:
-            line = l.decode().split()
+            line = l.encode('utf-8').decode('ascii').split()
             word = line[0]
             vect = np.array(line[1:]).astype(np.float)
             embedding[word] = vect
-            print(word, vect)
     return embedding
 
 def load_train_label(train_label_file):
