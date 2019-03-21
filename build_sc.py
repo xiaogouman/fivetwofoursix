@@ -58,7 +58,7 @@ class ConvNet(nn.Module):
     def create_embedding_layer(self, weight_matrix):
         # layer = nn.Embedding(len(weight_matrix), len(weight_matrix[0]), padding_idx=0)
         # weight = torch.FloatTensor([[1, 2.3, 3], [4, 5.1, 6.3]])
-        layer = nn.Embedding.from_pretrained(torch.FloatTensor(weight_matrix))
+        layer = nn.Embedding.from_pretrained(torch.LongTensor(weight_matrix))
 
         # weight = torch.FloatTensor([[1, 2.3, 3], [4, 5.1, 6.3]])
         # layer = nn.Embedding.from_pretrained(weight)
@@ -131,7 +131,7 @@ def load_word_embeddings(embeddings_file, word_index):
 
     print('start reading from embedding file')
     embedding = {}
-    weight_matrix = np.zeros((len(word_index), EMBEDDING_DIM))
+    weight_matrix = np.zeros((len(word_index)+1, EMBEDDING_DIM))
     with gzip.open(embeddings_file, "rb") as file:
         for l in file:
             line = l.decode().encode('utf-8').decode('utf-8').split()
@@ -180,13 +180,15 @@ def train_model(embeddings_file, train_text_file, train_label_file, model_file):
     # load data
     train_input, word_index = load_train_docs(train_text_file)
     train_label = load_train_label(train_label_file)
-    weight_matrix = load_word_embeddings(embeddings_file, word_index)
-
-    model = ConvNet(weight_matrix,KERNEL_SIZES).to(device)
-    print(summary(model, (1000, 2000, 300)))
-
     train_dataset = DatasetDocs(train_input, train_label)
     train_dataloader, val_dataloader = split_data(train_dataset)
+
+    # define model
+    weight_matrix = load_word_embeddings(embeddings_file, word_index)
+    model = ConvNet(weight_matrix, KERNEL_SIZES).to(device)
+    print(summary(model, (1000, 2000, 300)))
+
+
 
 
     ######## training ############
