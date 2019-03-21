@@ -55,15 +55,6 @@ class DatasetDocs(Dataset):
 
 
 class ConvNet(nn.Module):
-    def create_embedding_layer(self, weight_matrix):
-        # layer = nn.Embedding(len(weight_matrix), len(weight_matrix[0]), padding_idx=0)
-        # weight = torch.FloatTensor([[1, 2.3, 3], [4, 5.1, 6.3]])
-        layer = nn.Embedding.from_pretrained(torch.LongTensor(weight_matrix))
-
-        # weight = torch.FloatTensor([[1, 2.3, 3], [4, 5.1, 6.3]])
-        # layer = nn.Embedding.from_pretrained(weight)
-        return layer
-
     def create_conv_layers(self, input_dim, kernal_sizes, n_filters=32):
         layers = []
         for kernal_size in kernal_sizes:
@@ -186,7 +177,7 @@ def train_model(embeddings_file, train_text_file, train_label_file, model_file):
     # define model
     weight_matrix = load_word_embeddings(embeddings_file, word_index)
     model = ConvNet(weight_matrix, KERNEL_SIZES).to(device)
-    print(summary(model, (1000, 2000, 300)))
+    print(summary(model, (1, 2000, 300)))
 
 
 
