@@ -183,7 +183,7 @@ def train_model(embeddings_file, train_text_file, train_label_file, model_file):
     # print(embeddings)
     model = ConvNet(embeddings, KERNEL_SIZES).to(device)
     if torch.cuda.is_available():
-        model.cude()
+        model = model.cuda()
 
     print(model)
 
@@ -199,8 +199,8 @@ def train_model(embeddings_file, train_text_file, train_label_file, model_file):
         for inputs, labels in train_dataloader:
             # print("inputs: ", inputs)
             # print("labels: ", labels)
-            model.train()
-            optimizer.zero_grad()
+            # model.train()
+            # optimizer.zero_grad()
 
             inputs, labels = inputs.to(device), labels.to(device)
 
