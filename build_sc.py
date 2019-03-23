@@ -94,7 +94,6 @@ def load_train_docs(train_text_file):
         for line in file.readlines():
             # TODO: tokenize words
             words = [w.lower() for w in line.strip().split(' ')[2:]]
-            print(words)
             result.append(words)
             target_vocab.update(words)
             if len(words) > max_length:
@@ -183,6 +182,9 @@ def train_model(embeddings_file, train_text_file, train_label_file, model_file):
     embeddings = load_word_embeddings(embeddings_file, word_index)
     # print(embeddings)
     model = ConvNet(embeddings, KERNEL_SIZES).to(device)
+    if torch.cuda.is_available():
+        model.cude()
+
     print(model)
 
     # print(summary(model, (1, 2000, 300)))
