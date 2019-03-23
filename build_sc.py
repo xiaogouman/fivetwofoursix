@@ -13,7 +13,6 @@ import torch.optim as optim
 from torch.utils.data import Dataset
 from torch.utils import data
 
-import pickle
 
 EMBEDDING_DIM = 300
 N_FILTERS = 3
@@ -82,7 +81,6 @@ class ConvNet(nn.Module):
         return out
 
 
-
 # input:  is file name
 # output: matrix that each row is [w1, w2, w3 ...] for each doc, and set of all vocabulary
 def load_train_docs(train_text_file):
@@ -94,7 +92,7 @@ def load_train_docs(train_text_file):
     with open(train_text_file, "r") as file:
         for line in file.readlines():
             # TODO: tokenize words
-            words = [w.lower() for w in line.strip().split(" ")[2:]]
+            words = [w.lower() for w in line.strip().split(' ')[2:]]
             print(words)
             result.append(words)
             target_vocab.update(words)
@@ -115,7 +113,7 @@ def load_train_docs(train_text_file):
     return index_input, word_index
 
 
-def load_word_embeddings(embeddings_file, word_index):
+def load_word_embeddings(embeddings_file, word2idx):
     if os.path.exists(file_path):
         print('start loading weight_matrix')
         embeddings = np.load(file_path)
@@ -125,16 +123,38 @@ def load_word_embeddings(embeddings_file, word_index):
     print('start reading from embedding file')
     with gzip.open(embeddings_file, 'rt', encoding='utf-8') as f:
         # initialized randomly between -0.25 to 0.25
-        embeddings = np.random.rand((len(word_index) + 1, EMBEDDING_DIM))*0.5-0.25
-        embeddings[0] = np.zeros((EMBEDDING_DIM,))
-        for line in f:
-            line = line.strip().split(' ')
-            word, vect = line[0], np.array(line[1:]).astype(np.float)
-            if word in word_index:
-                idx = word_index[word]
-                embeddings[idx] = vect
+        # embeddings = np.random.rand(len(word_index) + 1, EMBEDDING_DIM)*0.5-0.25
+        # embeddings[0] = np.zeros((EMBEDDING_DIM,))
+        # for line in f:
+        #     line = line.strip().split(' ')
+        #     word, vect = line[0], np.array(line[1:]).astype(np.float)
+        #     if word in word_index:
+        #         idx = word_index[word]
+        #         embeddings[idx] = vect
 
+        embeddings = torch.rand(len(word2idx)+1, EMBEDDING_DIM) * 0.5 - 0.25
+        embeddings[0] = torch.zeros((EMBEDDING_DIM,))
+        for line in f:
+            line = line.strip()
+            first_space_pos = line.find(' ', 1)
+            word = line[:first_space_pos]
+            if word in word2idx:
+                idx = word2idx[word]
+                emb_str = line[first_space_pos + 1:].strip()
+                emb = [float(t) for t in emb_str.split(' ')]
+                embeddings[idx] = torch.tensor(emb)
     print('finish reading from embedding file')
+
+    # save weight matrix
+    print('start saving weight_matrix')
+    np.save(file_path, embeddings)
+    print('finish saving weight_matrix')
+
+    # save word index
+    print('saving word index')
+    w = csv.writer(open('word_idx.csv', 'w'))
+    for key, val in word2idx.items():
+        w.writerow([key, val])
     return embeddings
 
 
@@ -174,19 +194,10 @@ def train_model(embeddings_file, train_text_file, train_label_file, model_file):
     model = ConvNet(embeddings, KERNEL_SIZES).to(device)
     print(model)
 
-    # save weight matrix
-    print('start saving weight_matrix')
-    np.save(file_path, embeddings)
-    print('finish saving weight_matrix')
-
-    # save word index
-    print('saving word index')
-    w = csv.writer(open('word_idx.csv', 'w'))
-    for key, val in word_index.items():
-        w.writerow([key, val])
     # print(summary(model, (1, 2000, 300)))
 
     ######## training ############
+    print('training start')
     train_losses, test_losses = [], []
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
@@ -244,13 +255,13 @@ def train_model(embeddings_file, train_text_file, train_label_file, model_file):
 		
 if __name__ == "__main__":
     # make no changes here
-    # embeddings_file = sys.argv[1]
-    # train_text_file = sys.argv[2]
-    # train_label_file = sys.argv[3]
-    # model_file = sys.argv[4]
+    embeddings_file = sys.argv[1] if len(sys.argv) > 3 else "/Users/xiaogouman/Documents/masters/CS5246/Assignment/assignment_1/vectors.txt.gz"
+    train_text_file = sys.argv[2] if len(sys.argv) > 3 else "docs.train"
+    train_label_file = sys.argv[3] if len(sys.argv) > 3 else "classes.train"
+    model_file = sys.argv[4] if len(sys.argv) > 3 else "model_file"
 
-    embeddings_file = "/Users/xiaogouman/Documents/masters/CS5246/Assignment/assignment_1/vectors.txt.gz"
-    train_text_file = "docs.train"
-    train_label_file = "classes.train"
-    model_file = "model_file"
+    # embeddings_file = "/Users/xiaogouman/Documents/masters/CS5246/Assignment/assignment_1/vectors.txt.gz"
+    # train_text_file = "docs.train"
+    # train_label_file = "classes.train"
+    # model_file = "model_file"
     train_model(embeddings_file, train_text_file, train_label_file, model_file)
