@@ -11,16 +11,19 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import Dataset
+from torch.utils import data
 
 import pickle
 
 EMBEDDING_DIM = 300
-INPUT_DIM = 1500
-KERNEL_SIZES = [3]
-epochs = 1
-running_loss = 0
-print_every = 10
-learning_rate = 0.001
+N_FILTERS = 3
+MAX_LENGTH = 500
+KERNEL_SIZES = [3, 4]
+EPOCHS = 100
+LR = 0.01
+BATCH_SIZE = 10
+
+file_path = '../weight_matrix.npy'
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 
@@ -41,46 +44,41 @@ class DatasetDocs(Dataset):
         return len(self.X)
 
     def __getitem__(self, index):
-        # load image as ndarray type (Height * Width * Channels)
-        # be carefull for converting dtype to np.uint8 [Unsigned integer (0 to 255)]
-        # in this example, i don't use ToTensor() method of torchvision.transforms
-        # so you can convert numpy ndarray shape to tensor in PyTorch (H, W, C) --> (C, H, W)
-        doc = torch.Tensor(self.X[index])
-        label = torch.Tensor(self.Y[index])
-
+        doc = torch.from_numpy(np.asarray(self.X[index])).long()
+        # class = 1 => label = 0, class = 2 => label = 1
+        label = torch.from_numpy(np.asarray(self.Y[index]-1)).long()
         if self.transform is not None:
             doc = self.transform(doc)
-
         return doc, label
 
 
 class ConvNet(nn.Module):
-    def create_conv_layers(self, input_dim, kernal_sizes, n_filters=32):
+    def create_conv_layers(self, kernal_sizes):
         layers = []
         for kernal_size in kernal_sizes:
-            layer = nn.Conv1d(input_dim, n_filters, kernel_size=kernal_size, stride=1, padding=kernal_size-1)
+            layer = nn.Conv1d(in_channels=EMBEDDING_DIM, out_channels=N_FILTERS, kernel_size=kernal_size, stride=1, padding=kernal_size-1)
             layers.append(layer)
-            self.max_pooled_vev_dim = self.max_pooled_vev_dim + n_filters
         return layers
 
-    def __init__(self, weight_matrix, kernal_sizes, num_classes=2):
+    def __init__(self, embeddings, kernal_sizes, num_classes=2):
         super(ConvNet, self).__init__()
-        self.max_pooled_vev_dim = 0
-        self.embedding = nn.Embedding.from_pretrained(torch.FloatTensor(weight_matrix))
-        self.conv_layers = self.create_conv_layers(INPUT_DIM, kernal_sizes)
-        self.fc = nn.Linear(self.max_pooled_vev_dim, num_classes)
+        self.embedding = nn.Embedding.from_pretrained(torch.Tensor(embeddings))
+        self.conv_layers = self.create_conv_layers(kernal_sizes)
+        self.fc = nn.Linear(len(KERNEL_SIZES)*N_FILTERS, num_classes)
 
     def forward(self, x):
+        # print('input size', x.size())
         out = self.embedding(x)
-        cat_output = torch.Tensor()
-        for layer in self.conv_layers:
-            layer_output = layer(out)
-            layer_output = F.relu(layer_output)
-            layer_output = F.max_pool1d(torch.t(layer_output))
-            cat_output = torch.cat((cat_output, layer_output), 1)
-
-        out = self.fc(cat_output)
-        out = F.softmax(out)
+        # print('embedding out size', out.size())
+        out = out.permute(0, 2, 1)
+        # print ('permute out size', out.size())
+        out = [F.relu(conv(out)).max(2)[0] for conv in self.conv_layers]
+        out = torch.cat(out, 1)
+        # print('conv out size', out.size())
+        out = self.fc(out)
+        # print('fc out size', out.size())
+        out = F.softmax(out, dim=1)
+        # print('final output', out)
         return out
 
 
@@ -92,58 +90,53 @@ def load_train_docs(train_text_file):
     max_length = 0
     target_vocab = set()
     word_index = dict()
-    index = 1 # index = 0 is used for padding
+    index = 1  # index = 0 is used for padding
     with open(train_text_file, "r") as file:
-        for line in file:
+        for line in file.readlines():
             # TODO: tokenize words
-            words = line.split(" ")
+            words = [w.lower() for w in line.strip().split(" ")[2:]]
+            print(words)
             result.append(words)
             target_vocab.update(words)
             if len(words) > max_length:
                 max_length = len(words)
-    print ("max number of words: ", max_length)
+    print("max number of words: ", max_length)
     for word in target_vocab:
         word_index[word] = index
         index = index + 1
 
+    # transform from word to index
     index_input = []
     for doc in result:
         idxs = [word_index[word] for word in doc]
+        # make input length = MAX_LENGTH
+        idxs = np.pad(idxs, (0, MAX_LENGTH-len(idxs)), 'constant') if len(idxs) < MAX_LENGTH else idxs[:MAX_LENGTH]
         index_input.append(idxs)
     return index_input, word_index
 
+
 def load_word_embeddings(embeddings_file, word_index):
-    file_path = '../weight_matrix.npy'
     if os.path.exists(file_path):
         print('start loading weight_matrix')
-        weight_matrix = np.load(file_path)
+        embeddings = np.load(file_path)
         print('finish loading weight_matrix')
-        return weight_matrix
+        return embeddings
 
     print('start reading from embedding file')
-    embedding = {}
-    weight_matrix = np.zeros((len(word_index)+1, EMBEDDING_DIM))
-    with gzip.open(embeddings_file, "rb") as file:
-        for l in file:
-            line = l.decode().encode('utf-8').decode('utf-8').split()
+    with gzip.open(embeddings_file, 'rt', encoding='utf-8') as f:
+        # initialized randomly between -0.25 to 0.25
+        embeddings = np.random.rand((len(word_index) + 1, EMBEDDING_DIM))*0.5-0.25
+        embeddings[0] = np.zeros((EMBEDDING_DIM,))
+        for line in f:
+            line = line.strip().split(' ')
             word, vect = line[0], np.array(line[1:]).astype(np.float)
-            embedding[word] = vect
+            if word in word_index:
+                idx = word_index[word]
+                embeddings[idx] = vect
+
     print('finish reading from embedding file')
+    return embeddings
 
-    # if pretrained matrix does not exist, generate random weight
-    found = 0
-    for word, idx in word_index.items():
-        if word in embedding:
-            found = found + 1
-            weight_matrix[idx] = embedding[word]
-        else:
-            weight_matrix[idx] = np.random.normal(scale=0.6, size=(EMBEDDING_DIM,))
-    print('total vocab: ', len(word_index), 'found: ', found)
-
-    print('start saving weight_matrix')
-    np.save(file_path, weight_matrix)
-    print('finish saving weight_matrix')
-    return weight_matrix
 
 def load_train_label(train_label_file):
     result = []
@@ -152,17 +145,17 @@ def load_train_label(train_label_file):
             result.append(int(line))
     return result
 
-from torch.utils import data
 
 def split_data(dataset):
     n = len(dataset)
     n_train = int(n*0.8)
     n_val = n - n_train
     train_set, val_set = data.random_split(dataset, (n_train, n_val))
-    return data.DataLoader(train_set), data.DataLoader(val_set)
+    return data.DataLoader(train_set, batch_size=BATCH_SIZE), data.DataLoader(val_set, batch_size=BATCH_SIZE)
 
 
 from torchsummary import summary
+import csv
 
 def train_model(embeddings_file, train_text_file, train_label_file, model_file):
     # write your code here. You can add functions as well.
@@ -171,29 +164,45 @@ def train_model(embeddings_file, train_text_file, train_label_file, model_file):
     # load data
     train_input, word_index = load_train_docs(train_text_file)
     train_label = load_train_label(train_label_file)
-    train_dataset = DatasetDocs(train_input, train_label)
-    train_dataloader, val_dataloader = split_data(train_dataset)
+    dataset = DatasetDocs(train_input, train_label)
+    train_dataloader, val_dataloader = split_data(dataset)
+    print('length; ', len(dataset))
 
     # define model
-    weight_matrix = load_word_embeddings(embeddings_file, word_index)
-    model = ConvNet(weight_matrix, KERNEL_SIZES).to(device)
-    print(summary(model, (1, 2000, 300)))
+    embeddings = load_word_embeddings(embeddings_file, word_index)
+    # print(embeddings)
+    model = ConvNet(embeddings, KERNEL_SIZES).to(device)
+    print(model)
 
+    # save weight matrix
+    print('start saving weight_matrix')
+    np.save(file_path, embeddings)
+    print('finish saving weight_matrix')
 
-
+    # save word index
+    print('saving word index')
+    w = csv.writer(open('word_idx.csv', 'w'))
+    for key, val in word_index.items():
+        w.writerow([key, val])
+    # print(summary(model, (1, 2000, 300)))
 
     ######## training ############
     train_losses, test_losses = [], []
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-    steps=0
-    total_steps=len(train_input)
-    for epoch in range(epochs):
+    optimizer = torch.optim.Adam(model.parameters(), lr=LR)
+    total_steps = len(train_dataloader)
+    for epoch in range(EPOCHS):
+        steps = 0
         for inputs, labels in train_dataloader:
+            # print("inputs: ", inputs)
+            # print("labels: ", labels)
+            model.train()
+            optimizer.zero_grad()
+
             steps += 1
             inputs, labels = inputs.to(device), labels.to(device)
 
-            # forward pass
+            # forward pas
             outputs = model(inputs)
             loss = criterion(outputs, labels)
 
@@ -202,19 +211,46 @@ def train_model(embeddings_file, train_text_file, train_label_file, model_file):
             loss.backward()
             optimizer.step()
 
-            if (steps) % 100 == 0:
-                print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'
-                      .format(epoch + 1, epochs, steps, total_steps, loss.item()))
+            if steps % 100 == 0:
+
+                # checkpoint model periodically
+                # if steps % args.save_every == 0:
+                #     snapshot_prefix = os.path.join(args.save_path, 'snapshot')
+                #     snapshot_path = snapshot_prefix + '_acc_{:.4f}_loss_{:.6f}_iter_{}_model.pt'.format(train_acc,
+                #                                                                                         loss.item(),
+                #                                                                                         iterations)
+                #     torch.save(model, snapshot_path)
+                #     for f in glob.glob(snapshot_prefix + '*'):
+                #         if f != snapshot_path:
+                #             os.remove(f)c
+
+                # switch model to evaluation mode
+                model.eval()
+
+                # calculate accuracy on validation set
+                n_val_correct, val_loss = 0, 0
+                with torch.no_grad():
+                    for inputs, labels in val_dataloader:
+                        outputs = model(inputs)
+                        n_val_correct += (torch.max(outputs, 1)[1] == labels).sum().item()
+                        val_loss = criterion(outputs, labels).item()
+                val_acc = 100. * n_val_correct / len(val_dataloader)
+
+                print('Epoch [{}/{}], Step [{}/{}], Train Loss: {:.4f}, Val Acc: {:.2f}, Val Loss: {:.4f}'
+                      .format(epoch + 1, EPOCHS, steps, total_steps, loss.item(), val_acc, val_loss))
 
     torch.save(model.state_dict(), 'model.ckpt')
-
-
     print('Finished...')
 		
 if __name__ == "__main__":
     # make no changes here
-    embeddings_file = sys.argv[1]
-    train_text_file = sys.argv[2]
-    train_label_file = sys.argv[3]
-    model_file = sys.argv[4]
+    # embeddings_file = sys.argv[1]
+    # train_text_file = sys.argv[2]
+    # train_label_file = sys.argv[3]
+    # model_file = sys.argv[4]
+
+    embeddings_file = "/Users/xiaogouman/Documents/masters/CS5246/Assignment/assignment_1/vectors.txt.gz"
+    train_text_file = "docs.train"
+    train_label_file = "classes.train"
+    model_file = "model_file"
     train_model(embeddings_file, train_text_file, train_label_file, model_file)
