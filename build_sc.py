@@ -5,6 +5,7 @@ import math
 import sys
 import gzip
 import numpy as np
+import re
 
 import torch
 import torch.nn as nn
@@ -15,14 +16,14 @@ from torch.utils import data
 
 
 EMBEDDING_DIM = 300
-N_FILTERS = 3
-MAX_LENGTH = 50
-KERNEL_SIZES = [3, 4]
+N_FILTERS = 64
+MAX_LENGTH = 100
+KERNEL_SIZES = [2, 3, 4]
 EPOCHS = 100
-LR = 0.01
-BATCH_SIZE = 10
+LR = 0.001
+BATCH_SIZE = 20
 
-file_path = '../weight_matrix.npy'
+file_path = '../weight_matrix.pkl'
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print('device: ', device)
 
@@ -92,8 +93,10 @@ def load_train_docs(train_text_file):
     index = 1  # index = 0 is used for padding
     with open(train_text_file, "r") as file:
         for line in file.readlines():
-            # TODO: tokenize words
+            # remove punctuations
+            line = re.sub(r'[^\w\s]','',line)
             words = [w.lower() for w in line.strip().split(' ')[2:]]
+            print(words)
             result.append(words)
             target_vocab.update(words)
             if len(words) > max_length:
@@ -116,14 +119,15 @@ def load_train_docs(train_text_file):
 def load_word_embeddings(embeddings_file, word2idx):
     if os.path.exists(file_path):
         print('start loading weight_matrix')
-        embeddings = np.load(file_path)
+        embeddings = torch.load(file_path)
         print('finish loading weight_matrix')
         return embeddings
 
     print('start reading from embedding file')
     with gzip.open(embeddings_file, 'rt', encoding='utf-8') as f:
-        embeddings = torch.rand(len(word2idx)+1, EMBEDDING_DIM) * 0.5 - 0.25
-        embeddings[0] = torch.zeros((EMBEDDING_DIM,))
+        # embeddings = torch.rand(len(word2idx)+1, EMBEDDING_DIM) * 0.5 - 0.25
+        # embeddings[0] = torch.zeros((EMBEDDING_DIM,))
+        embeddings = torch.zeros(len(word2idx)+1, EMBEDDING_DIM)
         for line in f:
             line = line.strip()
             first_space_pos = line.find(' ', 1)
@@ -137,7 +141,7 @@ def load_word_embeddings(embeddings_file, word2idx):
 
     # save weight matrix
     print('start saving weight_matrix')
-    np.save(file_path, embeddings)
+    torch.save(embeddings, file_path)
     print('finish saving weight_matrix')
 
     # save word index
@@ -180,7 +184,7 @@ def train_model(embeddings_file, train_text_file, train_label_file, model_file):
 
     # define model
     embeddings = load_word_embeddings(embeddings_file, word_index)
-    # print(embeddings)
+    print(embeddings)
     model = ConvNet(embeddings, KERNEL_SIZES).to(device)
     if torch.cuda.is_available():
         model = model.cuda()
@@ -199,9 +203,7 @@ def train_model(embeddings_file, train_text_file, train_label_file, model_file):
         for inputs, labels in train_dataloader:
             # print("inputs: ", inputs)
             # print("labels: ", labels)
-            # model.train()
-            # optimizer.zero_grad()
-
+            model.train()
             inputs, labels = inputs.to(device), labels.to(device)
 
             # forward pas
@@ -212,19 +214,6 @@ def train_model(embeddings_file, train_text_file, train_label_file, model_file):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-
-            # if steps % total_steps/20 == 0:
-
-                # checkpoint model periodically
-                # if steps % args.save_every == 0:
-                #     snapshot_prefix = os.path.join(args.save_path, 'snapshot')
-                #     snapshot_path = snapshot_prefix + '_acc_{:.4f}_loss_{:.6f}_iter_{}_model.pt'.format(train_acc,
-                #                                                                                         loss.item(),
-                #                                                                                         iterations)
-                #     torch.save(model, snapshot_path)
-                #     for f in glob.glob(snapshot_prefix + '*'):
-                #         if f != snapshot_path:
-                #             os.remove(f)c
 
         # switch model to evaluation mode
         model.eval()
@@ -238,12 +227,21 @@ def train_model(embeddings_file, train_text_file, train_label_file, model_file):
                 val_loss = criterion(outputs, labels).item()
         val_acc = n_val_correct / (len(val_dataloader) * BATCH_SIZE)
 
-        print('Epoch [{}/{}], Train Loss: {:.4f}, Val Acc: {:.2f}, Val Loss: {:.4f}'
-              .format(epoch + 1, EPOCHS, loss.item(), val_acc, val_loss))
+        n_train_correct, train_loss = 0, 0
+        with torch.no_grad():
+            for inputs, labels in train_dataloader:
+                outputs = model(inputs)
+                n_train_correct += (torch.max(outputs, 1)[1] == labels).sum().item()
+                train_loss = criterion(outputs, labels).item()
+        train_acc = n_train_correct / (len(train_dataloader) * BATCH_SIZE)
+
+        print('Epoch [{}/{}], Train acc: {:.2f}, Train Loss: {:.4f}, Val Acc: {:.2f}, Val Loss: {:.4f}'
+              .format(epoch + 1, EPOCHS, train_acc, train_loss, val_acc, val_loss))
 
     torch.save(model.state_dict(), 'model.ckpt')
     print('Finished...')
-		
+
+
 if __name__ == "__main__":
     # make no changes here
     embeddings_file = sys.argv[1] if len(sys.argv) > 3 else "/Users/xiaogouman/Documents/masters/CS5246/Assignment/assignment_1/vectors.txt.gz"
@@ -251,8 +249,4 @@ if __name__ == "__main__":
     train_label_file = sys.argv[3] if len(sys.argv) > 3 else "classes.train"
     model_file = sys.argv[4] if len(sys.argv) > 3 else "model_file"
 
-    # embeddings_file = "/Users/xiaogouman/Documents/masters/CS5246/Assignment/assignment_1/vectors.txt.gz"
-    # train_text_file = "docs.train"
-    # train_label_file = "classes.train"
-    # model_file = "model_file"
     train_model(embeddings_file, train_text_file, train_label_file, model_file)
