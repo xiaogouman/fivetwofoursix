@@ -16,7 +16,7 @@ from torch.utils import data
 
 EMBEDDING_DIM = 300
 N_FILTERS = 3
-MAX_LENGTH = 500
+MAX_LENGTH = 50
 KERNEL_SIZES = [3, 4]
 EPOCHS = 100
 LR = 0.01
@@ -24,6 +24,7 @@ BATCH_SIZE = 10
 
 file_path = '../weight_matrix.npy'
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+print('device: ', device)
 
 
 # embedding in pytorch -> https://pytorch.org/tutorials/beginner/nlp/word_embeddings_tutorial.html
@@ -122,16 +123,6 @@ def load_word_embeddings(embeddings_file, word2idx):
 
     print('start reading from embedding file')
     with gzip.open(embeddings_file, 'rt', encoding='utf-8') as f:
-        # initialized randomly between -0.25 to 0.25
-        # embeddings = np.random.rand(len(word_index) + 1, EMBEDDING_DIM)*0.5-0.25
-        # embeddings[0] = np.zeros((EMBEDDING_DIM,))
-        # for line in f:
-        #     line = line.strip().split(' ')
-        #     word, vect = line[0], np.array(line[1:]).astype(np.float)
-        #     if word in word_index:
-        #         idx = word_index[word]
-        #         embeddings[idx] = vect
-
         embeddings = torch.rand(len(word2idx)+1, EMBEDDING_DIM) * 0.5 - 0.25
         embeddings[0] = torch.zeros((EMBEDDING_DIM,))
         for line in f:
@@ -203,14 +194,12 @@ def train_model(embeddings_file, train_text_file, train_label_file, model_file):
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
     total_steps = len(train_dataloader)
     for epoch in range(EPOCHS):
-        steps = 0
         for inputs, labels in train_dataloader:
             # print("inputs: ", inputs)
             # print("labels: ", labels)
             model.train()
             optimizer.zero_grad()
 
-            steps += 1
             inputs, labels = inputs.to(device), labels.to(device)
 
             # forward pas
@@ -222,7 +211,7 @@ def train_model(embeddings_file, train_text_file, train_label_file, model_file):
             loss.backward()
             optimizer.step()
 
-            if steps % 100 == 0:
+            # if steps % total_steps/20 == 0:
 
                 # checkpoint model periodically
                 # if steps % args.save_every == 0:
@@ -235,20 +224,20 @@ def train_model(embeddings_file, train_text_file, train_label_file, model_file):
                 #         if f != snapshot_path:
                 #             os.remove(f)c
 
-                # switch model to evaluation mode
-                model.eval()
+        # switch model to evaluation mode
+        model.eval()
 
-                # calculate accuracy on validation set
-                n_val_correct, val_loss = 0, 0
-                with torch.no_grad():
-                    for inputs, labels in val_dataloader:
-                        outputs = model(inputs)
-                        n_val_correct += (torch.max(outputs, 1)[1] == labels).sum().item()
-                        val_loss = criterion(outputs, labels).item()
-                val_acc = 100. * n_val_correct / len(val_dataloader)
+        # calculate accuracy on validation set
+        n_val_correct, val_loss = 0, 0
+        with torch.no_grad():
+            for inputs, labels in val_dataloader:
+                outputs = model(inputs)
+                n_val_correct += (torch.max(outputs, 1)[1] == labels).sum().item()
+                val_loss = criterion(outputs, labels).item()
+        val_acc = n_val_correct / (len(val_dataloader) * BATCH_SIZE)
 
-                print('Epoch [{}/{}], Step [{}/{}], Train Loss: {:.4f}, Val Acc: {:.2f}, Val Loss: {:.4f}'
-                      .format(epoch + 1, EPOCHS, steps, total_steps, loss.item(), val_acc, val_loss))
+        print('Epoch [{}/{}], Train Loss: {:.4f}, Val Acc: {:.2f}, Val Loss: {:.4f}'
+              .format(epoch + 1, EPOCHS, loss.item(), val_acc, val_loss))
 
     torch.save(model.state_dict(), 'model.ckpt')
     print('Finished...')
