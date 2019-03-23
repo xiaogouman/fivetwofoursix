@@ -16,11 +16,11 @@ from torch.utils import data
 
 
 EMBEDDING_DIM = 300
-N_FILTERS = 64
+N_FILTERS = 32
 MAX_LENGTH = 100
 KERNEL_SIZES = [2, 3, 4]
 EPOCHS = 100
-LR = 0.001
+LR = 0.01
 BATCH_SIZE = 20
 
 file_path = '../weight_matrix.pkl'
@@ -35,7 +35,6 @@ print('device: ', device)
 # pytorch basics -> https://cs230-stanford.github.io/pytorch-getting-started.html
 
 class DatasetDocs(Dataset):
-
     def __init__(self, X, Y, transform=None):
         self.X = X
         self.Y = Y
@@ -85,35 +84,58 @@ class ConvNet(nn.Module):
 
 # input:  is file name
 # output: matrix that each row is [w1, w2, w3 ...] for each doc, and set of all vocabulary
-def load_train_docs(train_text_file):
+def load_docs(docs_file):
     result = []
-    max_length = 0
-    target_vocab = set()
-    word_index = dict()
-    index = 1  # index = 0 is used for padding
-    with open(train_text_file, "r") as file:
+    with open(docs_file, "r") as file:
         for line in file.readlines():
             # remove punctuations
             line = re.sub(r'[^\w\s]','',line)
-            words = [w.lower() for w in line.strip().split(' ')[2:]]
-            print(words)
+            words = [w.lower() for w in line.strip().split(' ') if w!='']
             result.append(words)
-            target_vocab.update(words)
-            if len(words) > max_length:
-                max_length = len(words)
+    return result
+
+
+def gen_word_index(docs):
+    max_length = 0
+    target_vocab = set()
+    word_index = {}
+    index = 1  # index = 0 is used for padding
+    for doc in docs:
+        target_vocab.update(doc)
+        if len(doc) > max_length:
+            max_length = len(docs)
     print("max number of words: ", max_length)
     for word in target_vocab:
         word_index[word] = index
         index = index + 1
 
+    # save word index
+    print('saving word index')
+    w = csv.writer(open('word_idx.csv', 'w'))
+    for key, val in word_index.items():
+        w.writerow([key, val])
+
+    return word_index
+
+
+def word_to_idx_inputs(docs, word_index):
     # transform from word to index
     index_input = []
-    for doc in result:
-        idxs = [word_index[word] for word in doc]
+    max_idx = len(word_index)
+    for doc in docs:
+        idxs = []
+        for word in doc:
+            if word in word_index:
+                idxs.append(word_index[word])
+            else:
+                # max_idx = max_idx+1
+                # idxs.append(max_idx)
+                # word_index[word] = max_idx
+                idxs.append(0)
         # make input length = MAX_LENGTH
         idxs = np.pad(idxs, (0, MAX_LENGTH-len(idxs)), 'constant') if len(idxs) < MAX_LENGTH else idxs[:MAX_LENGTH]
         index_input.append(idxs)
-    return index_input, word_index
+    return index_input
 
 
 def load_word_embeddings(embeddings_file, word2idx):
@@ -144,17 +166,12 @@ def load_word_embeddings(embeddings_file, word2idx):
     torch.save(embeddings, file_path)
     print('finish saving weight_matrix')
 
-    # save word index
-    print('saving word index')
-    w = csv.writer(open('word_idx.csv', 'w'))
-    for key, val in word2idx.items():
-        w.writerow([key, val])
     return embeddings
 
 
-def load_train_label(train_label_file):
+def load_label(filename):
     result = []
-    with open(train_label_file, "r") as file:
+    with open(filename, "r") as file:
         for line in file:
             result.append(int(line))
     return result
@@ -176,13 +193,25 @@ def train_model(embeddings_file, train_text_file, train_label_file, model_file):
 	# use torch library to save model parameters, hyperparameters, etc. to model_file
 
     # load data
-    train_input, word_index = load_train_docs(train_text_file)
-    train_label = load_train_label(train_label_file)
-    dataset = DatasetDocs(train_input, train_label)
-    train_dataloader, val_dataloader = split_data(dataset)
-    print('length; ', len(dataset))
+    train_docs = load_docs(train_text_file)
+    train_label = load_label(train_label_file)
+    word_index = gen_word_index(train_docs)
+    train_input = word_to_idx_inputs(train_docs, word_index)
+    train_dataset = DatasetDocs(train_input, train_label)
+
+    test_docs = load_docs('docs.test')
+    test_label = load_label('classes.test')
+    test_input = word_to_idx_inputs(test_docs, word_index)
+    test_dataset = DatasetDocs(test_input, test_label)
+
+    train_dataloader = data.DataLoader(train_dataset, batch_size=BATCH_SIZE)
+    val_dataloader = data.DataLoader(test_dataset, batch_size=BATCH_SIZE)
+
+    # train_dataloader, val_dataloader = split_data(dataset)
+    # print('length; ', len(dataset))
 
     # define model
+
     embeddings = load_word_embeddings(embeddings_file, word_index)
     print(embeddings)
     model = ConvNet(embeddings, KERNEL_SIZES).to(device)
@@ -198,11 +227,8 @@ def train_model(embeddings_file, train_text_file, train_label_file, model_file):
     train_losses, test_losses = [], []
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
-    total_steps = len(train_dataloader)
     for epoch in range(EPOCHS):
         for inputs, labels in train_dataloader:
-            # print("inputs: ", inputs)
-            # print("labels: ", labels)
             model.train()
             inputs, labels = inputs.to(device), labels.to(device)
 
