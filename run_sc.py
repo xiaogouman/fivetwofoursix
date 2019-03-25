@@ -19,12 +19,10 @@ class ConvNet(nn.Module):
     def __init__(self, embeddings, num_classes=2):
         super(ConvNet, self).__init__()
         self.embedding = nn.Embedding(list(embeddings.size())[0], EMBEDDING_DIM, _weight=embeddings, padding_idx=0)
-        # self.embedding = nn.Embedding.from_pretrained(torch.Tensor(embeddings))
-        self.conv2 = nn.Conv1d(in_channels=EMBEDDING_DIM, out_channels=96, kernel_size=2, stride=1, padding=2-1)
-        self.conv3 = nn.Conv1d(in_channels=EMBEDDING_DIM, out_channels=64, kernel_size=3, stride=1, padding=3-1)
-        self.conv4 = nn.Conv1d(in_channels=EMBEDDING_DIM, out_channels=32, kernel_size=4, stride=1, padding=4-1)
-        # self.conv5 = nn.Conv1d(in_channels=EMBEDDING_DIM, out_channels=N_FILTERS, kernel_size=5, stride=1, padding=5-1)
-        self.fc = nn.Linear(96+64+32, num_classes)
+        self.conv2 = nn.Conv1d(in_channels=EMBEDDING_DIM, out_channels=256, kernel_size=2, stride=1, padding=2-1)
+        self.conv3 = nn.Conv1d(in_channels=EMBEDDING_DIM, out_channels=128, kernel_size=3, stride=1, padding=3-1)
+        self.conv4 = nn.Conv1d(in_channels=EMBEDDING_DIM, out_channels=96, kernel_size=4, stride=1, padding=4-1)
+        self.fc = nn.Linear(256+128+96, num_classes)
 
     def forward(self, x):
         out = self.embedding(x)
@@ -32,9 +30,7 @@ class ConvNet(nn.Module):
         out2 = F.relu(self.conv2(out)).max(dim=2)[0]
         out3 = F.relu(self.conv3(out)).max(dim=2)[0]
         out4 = F.relu(self.conv4(out)).max(dim=2)[0]
-        # out5 = F.relu(self.conv5(out)).max(dim=2)[0]
         out = torch.cat((out2, out3, out4), dim=1)
-        # out = F.dropout(out, p=0.5)
         out = self.fc(out)
         out = F.softmax(out, dim=1)
         return out

@@ -17,7 +17,7 @@ import csv
 
 EMBEDDING_DIM = 300
 MAX_LENGTH = 300
-EPOCHS = 20
+EPOCHS = 9
 LR = 0.001
 BATCH_SIZE = 50
 
@@ -53,11 +53,10 @@ class ConvNet(nn.Module):
     def __init__(self, embeddings, num_classes=2):
         super(ConvNet, self).__init__()
         self.embedding = nn.Embedding(list(embeddings.size())[0], EMBEDDING_DIM, _weight=embeddings, padding_idx=0)
-        # self.embedding = nn.Embedding.from_pretrained(torch.Tensor(embeddings))
-        self.conv2 = nn.Conv1d(in_channels=EMBEDDING_DIM, out_channels=96, kernel_size=2, stride=1, padding=2-1)
-        self.conv3 = nn.Conv1d(in_channels=EMBEDDING_DIM, out_channels=64, kernel_size=3, stride=1, padding=3-1)
-        self.conv4 = nn.Conv1d(in_channels=EMBEDDING_DIM, out_channels=32, kernel_size=4, stride=1, padding=4-1)
-        self.fc = nn.Linear(96+64+32, num_classes)
+        self.conv2 = nn.Conv1d(in_channels=EMBEDDING_DIM, out_channels=256, kernel_size=2, stride=1, padding=2-1)
+        self.conv3 = nn.Conv1d(in_channels=EMBEDDING_DIM, out_channels=128, kernel_size=3, stride=1, padding=3-1)
+        self.conv4 = nn.Conv1d(in_channels=EMBEDDING_DIM, out_channels=96, kernel_size=4, stride=1, padding=4-1)
+        self.fc = nn.Linear(256+128+96, num_classes)
 
     def forward(self, x):
         out = self.embedding(x)
