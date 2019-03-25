@@ -99,7 +99,7 @@ def test_model(test_text_file, model_file, out_file):
     model.eval()
 
     # get output
-    test_input = torch.tensor(test_input)
+    test_input = torch.tensor(test_input).cuda() if torch.cuda.is_available() else torch.tensor(test_input)
     outputs = model(test_input)
 
     # write to file
