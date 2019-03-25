@@ -44,13 +44,12 @@ class DatasetDocs(Dataset):
         return len(self.X)
 
     def __getitem__(self, index):
+        # class = 1 => label = 0, class = 2 => label = 1
         if torch.cuda.is_available():
             doc = torch.tensor(self.X[index]).long().cuda()
-            # class = 1 => label = 0, class = 2 => label = 1
             label = torch.tensor(self.Y[index] - 1).long().cuda()
         else:
             doc = torch.tensor(self.X[index]).long()
-            # class = 1 => label = 0, class = 2 => label = 1
             label = torch.tensor(self.Y[index]-1).long()
         if self.transform is not None:
             doc = self.transform(doc)
@@ -144,12 +143,6 @@ def word_to_idx_inputs(docs, word_index):
 
 
 def load_word_embeddings(embeddings_file, word2idx):
-    # if os.path.exists(file_path):
-    #     print('start loading weight_matrix')
-    #     embeddings = torch.load(file_path)
-    #     print('finish loading weight_matrix')
-    #     return embeddings
-
     print('start reading from embedding file')
     with gzip.open(embeddings_file, 'rt', encoding='utf-8') as f:
         embeddings = torch.rand(len(word2idx)+1, EMBEDDING_DIM) * 0.5 - 0.25
@@ -165,12 +158,6 @@ def load_word_embeddings(embeddings_file, word2idx):
                 emb = [float(t) for t in emb_str.split(' ')]
                 embeddings[idx] = torch.tensor(emb)
     print('finish reading from embedding file')
-
-    # save weight matrix
-    # print('start saving weight_matrix')
-    # torch.save(embeddings, file_path)
-    # print('finish saving weight_matrix')
-
     return embeddings
 
 
@@ -253,12 +240,12 @@ if __name__ == "__main__":
 
     if not os.path.exists(model_file):
         os.makedirs(model_file)
-    train_model(embeddings_file, train_text_file, train_label_file, model_file)
+    # train_model(embeddings_file, train_text_file, train_label_file, model_file)
 
     from _datetime import datetime
     for BATCH_SIZE in [10, 30, 50, 100]:
         for MAX_LENGTH in [100, 300, 500, 1000]:
-            for LR in [0.005, 0.001, 0.0005]:
+            for LR in [ 0.001, 0.0005]:
                 print('=========== start of train ============')
                 print('BATCH_SIZE: ', BATCH_SIZE)
                 print('MAX_LENGTH: ', MAX_LENGTH)
