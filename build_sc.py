@@ -45,9 +45,9 @@ class DatasetDocs(Dataset):
 
     def __getitem__(self, index):
         if torch.cuda.is_available():
-            doc = torch.cuda.tensor(self.X[index]).long()
+            doc = torch.tensor(self.X[index]).long().cuda()
             # class = 1 => label = 0, class = 2 => label = 1
-            label = torch.cuda.tensor(self.Y[index]-1).long()
+            label = torch.tensor(self.Y[index] - 1).long().cuda()
         else:
             doc = torch.tensor(self.X[index]).long()
             # class = 1 => label = 0, class = 2 => label = 1
