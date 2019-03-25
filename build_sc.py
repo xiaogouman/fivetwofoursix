@@ -4,7 +4,6 @@ import os
 import math
 import sys
 import gzip
-import numpy as np
 import re
 
 import torch
@@ -45,9 +44,9 @@ class DatasetDocs(Dataset):
         return len(self.X)
 
     def __getitem__(self, index):
-        doc = torch.from_numpy(np.asarray(self.X[index])).long()
+        doc = torch.tensor(self.X[index]).long()
         # class = 1 => label = 0, class = 2 => label = 1
-        label = torch.from_numpy(np.asarray(self.Y[index]-1)).long()
+        label = torch.tensor(self.Y[index]-1).long()
         if self.transform is not None:
             doc = self.transform(doc)
         return doc, label
@@ -129,8 +128,13 @@ def word_to_idx_inputs(docs, word_index):
     for doc in docs:
         idxs = [word_index[word] if word in word_index else 0 for word in doc]
         # make input length = MAX_LENGTH
-        idxs = np.pad(idxs, (0, MAX_LENGTH-len(idxs)), 'constant') if len(idxs) < MAX_LENGTH else idxs[:MAX_LENGTH]
-        index_input.append(idxs)
+        padded_idxs = []
+        for i in range(MAX_LENGTH):
+            if i < len(idxs):
+                padded_idxs.append(idxs[i])
+            else:
+                padded_idxs.append(0)
+        index_input.append(padded_idxs)
     return index_input
 
 
@@ -244,6 +248,7 @@ if __name__ == "__main__":
 
     if not os.path.exists(model_file):
         os.makedirs(model_file)
+    train_model(embeddings_file, train_text_file, train_label_file, model_file)
 
     from _datetime import datetime
     for BATCH_SIZE in [10, 30, 50, 100]:

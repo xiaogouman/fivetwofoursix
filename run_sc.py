@@ -5,7 +5,6 @@ import math
 import sys
 import torch
 import re
-import numpy as np
 import csv
 import torch.nn as nn
 import torch.nn.functional as F
@@ -67,8 +66,13 @@ def word_to_idx_inputs(docs, word_index):
     for doc in docs:
         idxs = [word_index[word] if word in word_index else 0 for word in doc]
         # make input length = MAX_LENGTH
-        idxs = np.pad(idxs, (0, MAX_LENGTH-len(idxs)), 'constant') if len(idxs) < MAX_LENGTH else idxs[:MAX_LENGTH]
-        index_input.append(idxs)
+        padded_idxs = []
+        for i in range(MAX_LENGTH):
+            if i < len(idxs):
+                padded_idxs.append(idxs[i])
+            else:
+                padded_idxs.append(0)
+        index_input.append(padded_idxs)
     return index_input
 
 
@@ -95,7 +99,7 @@ def test_model(test_text_file, model_file, out_file):
     test_input = word_to_idx_inputs(test_docs, word_idx)
 
     # load model
-    model = torch.load('{}/model.pth'.format(model_file))
+    model = torch.load('{}/model.pth'.format(model_file)).to(device)
     model.eval()
 
     # get output
@@ -104,7 +108,12 @@ def test_model(test_text_file, model_file, out_file):
 
     # write to file
     labels = [label+1 for label in torch.max(outputs, 1)[1].numpy()]
-    np.save(out_file, labels)
+    with open(out_file, 'w') as file:
+        for i, label in enumerate(labels):
+            if i == len(labels) - 1:
+                file.write(str(label))
+            else:
+                file.write(str(label)+'\n')
 
     print('Finished...')
 
