@@ -65,7 +65,7 @@ class ConvNet(nn.Module):
         self.conv2 = nn.Conv1d(in_channels=EMBEDDING_DIM, out_channels=96, kernel_size=2, stride=1, padding=2-1)
         self.conv3 = nn.Conv1d(in_channels=EMBEDDING_DIM, out_channels=64, kernel_size=3, stride=1, padding=3-1)
         self.conv4 = nn.Conv1d(in_channels=EMBEDDING_DIM, out_channels=32, kernel_size=4, stride=1, padding=4-1)
-        self.conv4 = nn.Conv1d(in_channels=EMBEDDING_DIM, out_channels=16, kernel_size=5, stride=1, padding=5-1)
+        self.conv5 = nn.Conv1d(in_channels=EMBEDDING_DIM, out_channels=16, kernel_size=5, stride=1, padding=5-1)
         # self.conv5 = nn.Conv1d(in_channels=EMBEDDING_DIM, out_channels=N_FILTERS, kernel_size=5, stride=1, padding=5-1)
         self.fc = nn.Linear(96+64+32+16, num_classes)
 
