@@ -65,8 +65,9 @@ class ConvNet(nn.Module):
         self.conv2 = nn.Conv1d(in_channels=EMBEDDING_DIM, out_channels=96, kernel_size=2, stride=1, padding=2-1)
         self.conv3 = nn.Conv1d(in_channels=EMBEDDING_DIM, out_channels=64, kernel_size=3, stride=1, padding=3-1)
         self.conv4 = nn.Conv1d(in_channels=EMBEDDING_DIM, out_channels=32, kernel_size=4, stride=1, padding=4-1)
+        self.conv4 = nn.Conv1d(in_channels=EMBEDDING_DIM, out_channels=16, kernel_size=5, stride=1, padding=5-1)
         # self.conv5 = nn.Conv1d(in_channels=EMBEDDING_DIM, out_channels=N_FILTERS, kernel_size=5, stride=1, padding=5-1)
-        self.fc = nn.Linear(96+64+32, num_classes)
+        self.fc = nn.Linear(96+64+32+16, num_classes)
 
     def forward(self, x):
         out = self.embedding(x)
@@ -74,8 +75,8 @@ class ConvNet(nn.Module):
         out2 = F.relu(self.conv2(out)).max(dim=2)[0]
         out3 = F.relu(self.conv3(out)).max(dim=2)[0]
         out4 = F.relu(self.conv4(out)).max(dim=2)[0]
-        # out5 = F.relu(self.conv5(out)).max(dim=2)[0]
-        out = torch.cat((out2, out3, out4), dim=1)
+        out5 = F.relu(self.conv5(out)).max(dim=2)[0]
+        out = torch.cat((out2, out3, out4, out5), dim=1)
         # out = F.dropout(out, p=0.5)
         out = self.fc(out)
         out = F.softmax(out, dim=1)
@@ -243,9 +244,9 @@ if __name__ == "__main__":
     # train_model(embeddings_file, train_text_file, train_label_file, model_file)
 
     from _datetime import datetime
-    for BATCH_SIZE in [10, 30, 50, 100]:
-        for MAX_LENGTH in [100, 300, 500, 1000]:
-            for LR in [ 0.001, 0.0005]:
+    for BATCH_SIZE in [100]:
+        for MAX_LENGTH in [500, 1000]:
+            for LR in [0.0005]:
                 print('=========== start of train ============')
                 print('BATCH_SIZE: ', BATCH_SIZE)
                 print('MAX_LENGTH: ', MAX_LENGTH)
