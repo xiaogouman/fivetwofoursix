@@ -44,9 +44,14 @@ class DatasetDocs(Dataset):
         return len(self.X)
 
     def __getitem__(self, index):
-        doc = torch.tensor(self.X[index]).long()
-        # class = 1 => label = 0, class = 2 => label = 1
-        label = torch.tensor(self.Y[index]-1).long()
+        if torch.cuda.is_available():
+            doc = torch.cuda.tensor(self.X[index]).long()
+            # class = 1 => label = 0, class = 2 => label = 1
+            label = torch.cuda.tensor(self.Y[index]-1).long()
+        else:
+            doc = torch.tensor(self.X[index]).long()
+            # class = 1 => label = 0, class = 2 => label = 1
+            label = torch.tensor(self.Y[index]-1).long()
         if self.transform is not None:
             doc = self.transform(doc)
         return doc, label
