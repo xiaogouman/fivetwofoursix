@@ -103,7 +103,10 @@ def test_model(test_text_file, model_file, out_file):
     outputs = model(test_input)
 
     # write to file
-    labels = [label+1 for label in torch.max(outputs, 1)[1].numpy()]
+    labels = []
+    for label in torch.max(outputs, 1)[1]:
+        labels.append(label.item()+1)
+
     with open(out_file, 'w') as file:
         for i, label in enumerate(labels):
             if i == len(labels) - 1:
