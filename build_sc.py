@@ -16,10 +16,10 @@ import csv
 
 
 EMBEDDING_DIM = 300
-MAX_LENGTH = 300
+MAX_LENGTH = 1000
 EPOCHS = 9
 LR = 0.001
-BATCH_SIZE = 50
+BATCH_SIZE = 100
 
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
