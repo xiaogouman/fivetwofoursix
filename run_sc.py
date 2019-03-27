@@ -10,7 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 EMBEDDING_DIM = 300
-MAX_LENGTH = 200
+MAX_LENGTH = 1000
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 
